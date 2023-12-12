@@ -79,7 +79,12 @@ const (
 	HUMIDITY_TO_LOCATION    = 7
 )
 
-func ParseInput(lines []string) (seeds []int, m SeedToLocationMapper) {
+const (
+	SEED_MODE_NORMAL = 1
+	SEED_MODE_PAIRS  = 2
+)
+
+func ParseInput(lines []string, seedMode int) (seeds []int, m SeedToLocationMapper) {
 	mode := SEEDS
 	lastMode := SEEDS
 	var ranges []MapRange
@@ -111,13 +116,10 @@ func ParseInput(lines []string) (seeds []int, m SeedToLocationMapper) {
 
 		// parse seeds
 		if mode == SEEDS {
-			seedStrs := strings.Split(strings.Replace(line, "seeds: ", "", -1), " ")
-			for _, seedStr := range seedStrs {
-				seedNo, err := strconv.Atoi(seedStr)
-				if err != nil {
-					panic(err)
-				}
-				seeds = append(seeds, seedNo)
+			if seedMode == SEED_MODE_NORMAL {
+				seeds = ParseSeedsNormal(line)
+			} else {
+				seeds = ParseSeedsPairs(line)
 			}
 		}
 
@@ -130,6 +132,34 @@ func ParseInput(lines []string) (seeds []int, m SeedToLocationMapper) {
 	// append final range since it wont be caught by blank line check
 	m.Maps = append(m.Maps, Map{Ranges: ranges})
 
+	return
+}
+
+func ParseSeedsNormal(line string) (seeds []int) {
+	seedStrs := strings.Split(strings.Replace(line, "seeds: ", "", -1), " ")
+	for _, seedStr := range seedStrs {
+		seedNo, _ := strconv.Atoi(seedStr)
+		seeds = append(seeds, seedNo)
+	}
+	return
+}
+
+func ParseSeedsPairs(line string) (seeds []int) {
+	seedStrs := strings.Split(strings.Replace(line, "seeds: ", "", -1), " ")
+	var start int
+	for i, seedStr := range seedStrs {
+		n, _ := strconv.Atoi(seedStr)
+		if i == 0 || i%2 == 0 {
+			// if even, this is a range start
+			start = n
+		} else {
+			// if odd, it's a range length
+			for v := start; v < start+n; v++ {
+				seeds = append(seeds, v)
+			}
+			break
+		}
+	}
 	return
 }
 
@@ -154,10 +184,11 @@ func main() {
 		lines = append(lines, scanner.Text())
 	}
 
-	seeds, mapper := ParseInput(lines)
+	seeds, mapper := ParseInput(lines, SEED_MODE_PAIRS)
 
-	fmt.Printf("seeds: %v\n", seeds)
+	fmt.Printf("seeds: %v\n", len(seeds))
 	fmt.Printf("mapper: %+v\n", mapper)
+	return
 
 	locations := mapper.MapAll(seeds)
 	fmt.Printf("locations: %v\n", locations)

@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -28,27 +28,29 @@ func (r MapRange) SourceInRange(n int) bool {
 	minInclusive := r.SourceStart
 	maxExclusive := r.SourceStart + r.Range
 	if n >= minInclusive && n < maxExclusive {
-		fmt.Printf("n: %v is within %d and %d\n", n, minInclusive, maxExclusive)
+		// fmt.Printf("n: %v is within %d and %d\n", n, minInclusive, maxExclusive)
 		return true
 	}
-	fmt.Printf("n: %v not within %d and %d\n", n, minInclusive, maxExclusive)
+	// fmt.Printf("n: %v not within %d and %d\n", n, minInclusive, maxExclusive)
 	return false
 }
 
 // Given a number `n`, map it to it's corresponding output value according
 // to the list of `Ranges`
 func (m Map) Map(n int) int {
-	fmt.Printf("m: %+v\n", m)
+	// fmt.Printf("m: %+v\n", m)
 	for _, r := range m.Ranges {
-		fmt.Printf("r: %+v\n", r)
+		// fmt.Printf("r: %+v\n", r)
 		if r.SourceInRange(n) {
 			// convert
-			destIndex := n - r.SourceStart
-			return r.DestStart + destIndex
+			val := r.DestStart + (n - r.SourceStart)
+			// fmt.Printf("%v > %v\n", n, val)
+			return val
 		}
 	}
 
 	// default to same number
+	// fmt.Printf("%v > %v\n", n, n)
 	return n
 }
 
@@ -59,11 +61,44 @@ func (sm SeedToLocationMapper) MapAll(seeds []int) (out []int) {
 		fmt.Printf("SEED: %d\n", seed)
 		res := seed
 		for _, m := range sm.Maps {
-			fmt.Printf("res: %v\n", res)
 			res = m.Map(res)
+			// fmt.Printf(" > %v", res)
 		}
+		// fmt.Println("")
 		out = append(out, res)
 	}
+	return
+}
+
+// Given a list of seeds, maps each one all the way to the corresponding
+// location number, returning the minimum location value
+func (sm SeedToLocationMapper) MapMinPairs(seeds []int) (min int) {
+	var start int
+	min = math.MaxInt64 // min starts at the maximum possible int value
+
+	for i, n := range seeds {
+		if i == 0 || i%2 == 0 {
+			// first pair is the start number
+			start = n
+		} else {
+			// second number is the range length
+			for v := start; v < start+n; v++ {
+				res := v
+				// for each number in the range, map them down to the location number
+				// fmt.Printf("seed: %v", v)
+				for _, m := range sm.Maps {
+					res = m.Map(res)
+					// fmt.Printf(" > %v", res)
+				}
+				// fmt.Println("")
+				// check for a new min
+				if res < min {
+					min = res
+				}
+			}
+		}
+	}
+
 	return
 }
 
@@ -84,7 +119,7 @@ const (
 	SEED_MODE_PAIRS  = 2
 )
 
-func ParseInput(lines []string, seedMode int) (seeds []int, m SeedToLocationMapper) {
+func ParseInput(lines []string) (seeds []int, m SeedToLocationMapper) {
 	mode := SEEDS
 	lastMode := SEEDS
 	var ranges []MapRange
@@ -116,11 +151,7 @@ func ParseInput(lines []string, seedMode int) (seeds []int, m SeedToLocationMapp
 
 		// parse seeds
 		if mode == SEEDS {
-			if seedMode == SEED_MODE_NORMAL {
-				seeds = ParseSeedsNormal(line)
-			} else {
-				seeds = ParseSeedsPairs(line)
-			}
+			seeds = ParseSeeds(line)
 		}
 
 		// parse maps
@@ -135,30 +166,11 @@ func ParseInput(lines []string, seedMode int) (seeds []int, m SeedToLocationMapp
 	return
 }
 
-func ParseSeedsNormal(line string) (seeds []int) {
+func ParseSeeds(line string) (seeds []int) {
 	seedStrs := strings.Split(strings.Replace(line, "seeds: ", "", -1), " ")
 	for _, seedStr := range seedStrs {
 		seedNo, _ := strconv.Atoi(seedStr)
 		seeds = append(seeds, seedNo)
-	}
-	return
-}
-
-func ParseSeedsPairs(line string) (seeds []int) {
-	seedStrs := strings.Split(strings.Replace(line, "seeds: ", "", -1), " ")
-	var start int
-	for i, seedStr := range seedStrs {
-		n, _ := strconv.Atoi(seedStr)
-		if i == 0 || i%2 == 0 {
-			// if even, this is a range start
-			start = n
-		} else {
-			// if odd, it's a range length
-			for v := start; v < start+n; v++ {
-				seeds = append(seeds, v)
-			}
-			break
-		}
 	}
 	return
 }
@@ -184,15 +196,14 @@ func main() {
 		lines = append(lines, scanner.Text())
 	}
 
-	seeds, mapper := ParseInput(lines, SEED_MODE_PAIRS)
+	seeds, mapper := ParseInput(lines)
 
 	fmt.Printf("seeds: %v\n", len(seeds))
 	fmt.Printf("mapper: %+v\n", mapper)
-	return
 
-	locations := mapper.MapAll(seeds)
-	fmt.Printf("locations: %v\n", locations)
+	// locations := mapper.MapAll(seeds)
+	// fmt.Printf("locations: %v\n", locations)
 
-	minLocation := slices.Min(locations)
+	minLocation := mapper.MapMinPairs(seeds)
 	fmt.Printf("minLocation: %v\n", minLocation)
 }
